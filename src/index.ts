@@ -1,16 +1,21 @@
-import express from 'express';
+
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import noteRoutes from './routes/noteRoutes';
+import dotenv from 'dotenv';
+const express = require('express');
+const mongoose = require('mongoose')
+const router = require('./routes/index.route');
 
+dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3030;
 
 // MongoDB connection
-const mongoURI = 'mongodb://127.0.0.1:27017'; 
+const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://gwezsopaid:0Zw8IUwrFGGSWNmb@noteapi.5s5np.mongodb.net/'; 
 mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected'))
-    .catch(error => console.error('MongoDB connection error:', error));
+    .catch(error => console.error('MongoDB connection error:', Error));
 
 app.use(cors());
 app.use(bodyParser.json());
