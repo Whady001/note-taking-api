@@ -1,23 +1,27 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
 import Note, {INote} from '../models/note.model';
 const NoteService = require('../services/note.service');
+import Category from "../models/category";
+import { NotFoundError, BadRequestError } from "../middlewares/errorHandler";
 
-let notes : INote[] = [];
+//let notes : INote[] = [];
 
-class NoteController {
+class NoteController <INote>{
     //get all notes
-    async getNotes(req: Request, res: Response) {
+    async getNotes(req: Request, res: Response, next : NextFunction) {
         try {
-            const notes = await Note.find();
+            const notes = await Note.find().populate("category", "name");
             res.status(200).json(notes);
         } catch (error) {
             res.status(500).json({ message: `Could not get notes` });
+            next(error);
         }
     }
 
     //get note by id
-    async getNoteById(req: Request, res: Response) {
-        const noteId = req.params.id; // Assuming the route is /notes/:id
+    async getNoteById(req: Request, res: Response, next: NextFunction) {
+        const noteId = req.params._id; 
         try {
             const existingNote = await NoteService.fetchOne({ _id: noteId });
             if (!existingNote) {
@@ -25,6 +29,7 @@ class NoteController {
                     success: false,
                     message: "Note with Id does not exist"
                 });
+                return next(new NotFoundError("Invalid note ID"));
             }
             res.status(200).json({
                 success: true,
@@ -35,13 +40,52 @@ class NoteController {
             res.status(500).json({ message: "Error fetching note" });
         }
     }
+
+    //get by category id
+    async getByCategoryId (req: Request <{categoryId: string}>, res: Response, next: NextFunction) {
+        try {
+            const { categoryId } = req.params;
+        
+            if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+              return next(new BadRequestError("Invalid category ID"));
+            }
+        
+            const notes = await Note.find({ category: categoryId }).populate("category", "name");
+        
+            res.json(notes);
+        } catch (error) {
+            next(error);
+        }
+    }
+    
     //create a note
-    async createNote(req: Request, res: Response) {
+    async createNote(req: Request, res: Response, next: NextFunction) {
         const reqBody = req.body;
         try {
             const existingNote = await NoteService.fetchOne({
                 name: reqBody.name.toLowerCase()
             });
+            const { title, content, category } = req.body;
+            let categoryId = category;
+
+            if (!category) {
+            let defaultCategory = await Category.findOne({ name: "Uncategorized" });
+            if (!defaultCategory) {
+                defaultCategory = new Category({ name: "Uncategorized" });
+                await defaultCategory.save();
+            }
+            categoryId = defaultCategory._id;
+            } else {
+            if (!mongoose.Types.ObjectId.isValid(category)) {
+                return next(new BadRequestError("Invalid category ID"));
+            }
+
+            let existingCategory = await Category.findById(category);
+            if (!existingCategory) {
+                return next(new BadRequestError("Category not found"));
+            }
+            categoryId = existingCategory._id;
+            }
             if (existingNote) {
                 return res.status(403).json({
                     success: false,
@@ -60,9 +104,9 @@ class NoteController {
     }
 
     // Update a note
-    async updateNote(req: Request, res: Response) {
+    async updateNote(req: Request, res: Response, next: NextFunction) {
         const noteId = req.params._id; 
-        const updateData = req.body;
+        const updateData: string = req.body;
         try {
             const existingNote = await NoteService.fetchOne({ _id: noteId });
             if (!existingNote) {
@@ -72,12 +116,12 @@ class NoteController {
                 });
             }
 
-            // Check for unique name
-            if (updateData.name) {
-                const existingNoteWithUpdateName = await NoteService.fetchOne({
-                    name: updateData.name.toLowerCase()
+            // Check for unique title
+            if (updateData) {
+                const existingNoteWithUpdateTitle = await NoteService.fetchOne({
+                    name: updateData.toLowerCase
                 });
-                if (existingNoteWithUpdateName && existingNoteWithUpdateName._id.toString() !== existingNote._id.toString()) {
+                if (existingNoteWithUpdateTitle && existingNote._id.toString() !== existingNote._id.toString()) {
                     return res.status(403).json({
                         success: false,
                         message: "Note with updated name already exists"
@@ -97,13 +141,18 @@ class NoteController {
     }
 
     //delete a note
-    async deleteNote(req: Request, res: Response) {
+    async deleteNote(req: Request, res: Response, next: NextFunction) {
         try {
-            const note = await Note.findByIdAndDelete(req.params.id);
-            if (!note) {
-                return res.status(404).send('Note not found');
+            const noteId = req.params._id; 
+            const note = await Note.findByIdAndDelete(req.params._id);
+            if (!mongoose.Types.ObjectId.isValid(noteId)) {
+                return next(new NotFoundError("Invalid note ID"));
+            
+                if (!note) {
+                    return res.status(404).send('Note not found');
+                }
             }
-            res.status(204).send();
+                res.status(204).json({message : `Note with ID ${noteId} deleted successfully`});
         } catch (error) {
             res.status(500).send('Error deleting note');
         }
