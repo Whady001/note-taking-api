@@ -4,6 +4,7 @@ import Note, {INote} from '../models/note.model';
 const NoteService = require('../services/note.service');
 import Category from "../models/category";
 import { NotFoundError, BadRequestError } from "../middlewares/errorHandler";
+//import { title } from "node:process";
 
 //let notes : INote[] = [];
 
@@ -119,7 +120,7 @@ class NoteController <INote>{
             // Check for unique title
             if (updateData) {
                 const existingNoteWithUpdateTitle = await NoteService.fetchOne({
-                    name: updateData.toLowerCase
+                    title: updateData.toLowerCase()
                 });
                 if (existingNoteWithUpdateTitle && existingNote._id.toString() !== existingNote._id.toString()) {
                     return res.status(403).json({
@@ -130,7 +131,7 @@ class NoteController <INote>{
             }
 
             const updatedData = await NoteService.update(noteId, updateData);
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
                 message: "Note updated successfully",
                 data: updatedData
@@ -147,10 +148,9 @@ class NoteController <INote>{
             const note = await Note.findByIdAndDelete(req.params._id);
             if (!mongoose.Types.ObjectId.isValid(noteId)) {
                 return next(new NotFoundError("Invalid note ID"));
-            
-                if (!note) {
-                    return res.status(404).send('Note not found');
-                }
+            }
+            else if (!note) {
+                return res.status(404).send('Note not found');
             }
                 res.status(204).json({message : `Note with ID ${noteId} deleted successfully`});
         } catch (error) {

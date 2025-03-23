@@ -20,7 +20,7 @@ class NoteService {
     }
     //Get a single note
     async fetchOne(noteFetchOne : INote) {
-        return await Note.find(noteFetchOne);
+        return await Note.findOne(noteFetchOne);
     }
     //Fetch all notes
     async fetch (filter : INote) {
